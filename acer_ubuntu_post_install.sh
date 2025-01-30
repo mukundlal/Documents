@@ -29,5 +29,5 @@ echo "Updating GRUB..."
 sudo chroot /mnt update-grub
 
 #Reboot
-echo "Rebooting..."
-sudo reboot
+echo "You can reboot now! using 'sudo reboot'"
+

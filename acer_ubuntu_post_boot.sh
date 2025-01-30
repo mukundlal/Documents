@@ -1,21 +1,26 @@
 
 
-# Hijack the fallback bootloader
-echo "Configuring fallback bootloader..."
-sudo chroot /mnt /bin/bash -c "cd /boot/efi/EFI && cp -R ubuntu/* BOOT/ && cd BOOT && cp grubx64.efi bootx64.efi"
+#!/bin/bash
 
-# Make fallback bootloader permanent
-echo "Making fallback bootloader permanent..."
-echo "grub-efi-amd64 grub2/force_efi_extra_removable boolean true" | sudo chroot /mnt debconf-set-selections
-sudo chroot /mnt update-grub
+# Ensure the script runs as root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run this script as root (use sudo)."
+    exit 1
+fi
 
-# Remove secureboot-db
-echo "Removing secureboot-db..."
-sudo chroot /mnt apt remove secureboot-db -y
+echo "Setting GRUB to install in the fallback bootloader location..."
+echo "grub-efi-amd64 grub2/force_efi_extra_removable boolean true" | sudo debconf-set-selections
 
-# Final system updates
-echo "Updating system..."
-sudo chroot /mnt /bin/bash -c "do-release-upgrade -y && apt update && apt upgrade -y && apt dist-upgrade -y && apt autoremove -y && apt autoclean -y"
+echo "Removing secureboot-db to prevent boot issues..."
+sudo apt remove -y secureboot-db
+
+echo "Preventing secureboot-db from reinstalling..."
+echo "secureboot-db hold" | sudo dpkg --set-selections
+
+echo "Updating GRUB configuration..."
+sudo update-grub
+
+echo "Done! Your system is now protected from Acer's buggy UEFI."
 
 # Completion message
 echo "Installation complete! Reboot your system."
