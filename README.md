@@ -1,103 +1,161 @@
-# Tutorial: Installing Ubuntu on an Acer Aspire ES-15
+# Installing Ubuntu on Acer Aspire ES-15: Complete Guide
 
-The Acer Aspire ES-15 has a poor EFI implementation, making the NVRAM read-only. This causes normal Linux installations to fail. This tutorial walks you through the installation process step by step. It may also work with minimal changes on other laptops with weak EFI implementations.
+## Overview
+This guide provides detailed instructions for installing Ubuntu on the Acer Aspire ES-15 laptop, which has a problematic EFI implementation with read-only NVRAM. This guide may also be useful for other laptops with similar EFI limitations.
 
-## Step 1: Enter UEFI Setup
-1. Restart your laptop and enter the UEFI Setup screen.
-2. Go to the **'Security'** tab and set a **'Supervisor password'** (e.g., `1`).
-3. Navigate to the **'Boot'** tab and disable **'Secure Boot'**.
-4. Return to the **'Main'** tab and:
-   - Disable **'Fast Boot'**
-   - Enable **'F12 Boot Menu'**
+### Prerequisites
+- Ubuntu 18.04 installation media (USB drive)
+- Backup of all important data
+- External keyboard (recommended, in case internal keyboard becomes unresponsive)
+- Approximately 1 hour of time
+- Internet connection (for updates)
 
-> **NOTE:** Use Ubuntu **18.04** for installation. Newer versions won't boot due to a package called `secureboot-db`.
+### Important Notes
+- ⚠️ **Backup Warning**: Always back up your data before proceeding with any OS installation
+- 🛑 **Version Requirement**: Ubuntu 18.04 is required due to `secureboot-db` package incompatibilities
+- 💡 **Recovery**: Note down your Windows product key if dual-booting
+- 🔋 **Power**: Keep your laptop plugged in throughout the installation
 
-## Step 2: Boot Ubuntu Install USB
-1. Insert your Ubuntu USB installation media.
-2. Press `F12` at startup and select your USB drive.
-3. On the GRUB screen, press `e` to edit boot options.
-4. Locate the Linux line and add the following after `splash`:
+## Detailed Installation Steps
+
+### Step 1: UEFI Configuration
+1. Access UEFI Setup:
+   - Power off the laptop completely
+   - Power on and repeatedly press `F2` until UEFI Setup appears
+   - If `F2` doesn't work, try `Del` or `Esc`
+
+2. Configure UEFI Settings:
    ```
-   PCI=NOAER
+   Security Tab:
+   └── Set Supervisor Password: [create simple password, e.g., '1']
+   
+   Boot Tab:
+   ├── Secure Boot: [Disabled]
+   └── Boot Mode: [UEFI]
+   
+   Main Tab:
+   ├── Fast Boot: [Disabled]
+   └── F12 Boot Menu: [Enabled]
    ```
-   > This step may not be required, but it won't hurt.
-5. Boot into Ubuntu and open a terminal.
-6. Run the following command to install Ubuntu **without a bootloader**:
+
+3. Save and Exit:
+   - Press `F10`
+   - Select 'Yes' to save changes
+   - System will restart
+
+### Step 2: Ubuntu Installation Preparation
+
+1. Boot from USB:
+   - Insert Ubuntu USB drive
+   - During startup, press `F12` repeatedly
+   - Select USB drive from boot menu
+
+2. Modify Boot Parameters:
    ```
+   At GRUB menu:
+   1. Press 'e' to edit boot options
+   2. Find line starting with 'linux'
+   3. Add 'PCI=NOAER' after 'splash'
+   4. Press F10 to boot
+   ```
+
+3. Start Custom Installation:
+   ```bash
+   # Open terminal (Ctrl + Alt + T)
    ubiquity -b
    ```
-7. Follow the on-screen Ubuntu installation steps.
-8. After installation, select **'Continue testing Ubuntu'** and open a terminal.
 
-## Step 3: Configure the Bootloader
-### Identify Your Partitions
-Determine your newly installed Linux partition (root) and EFI partition:
-```sh
-lsblk
-```
-Substitute `/dev/sdx` (root) and `/dev/sdy` (EFI) in the commands below.
+4. During Installation:
+   - Choose 'Install Ubuntu'
+   - Select language and keyboard layout
+   - Choose 'Normal Installation'
+   - For Wi-Fi, select 'Connect to this network later'
+   - For installation type:
+     - If dual-booting: 'Install Ubuntu alongside Windows'
+     - If single OS: 'Erase disk and install Ubuntu'
+   - Select timezone
+   - Create user account
+   - Wait for installation to complete
+   - Select 'Continue Testing' when prompted
 
-### Mount the Partitions
-```sh
-sudo mount /dev/sdx /mnt
-sudo mkdir /mnt/boot/efi
-sudo mount /dev/sdy /mnt/boot/efi
-for i in /dev /dev/pts /proc /sys; do sudo mount -B $i /mnt$i; done
-```
+### Step 3: Bootloader Configuration
 
-### Ensure `efivars` is Loaded
-```sh
-sudo modprobe efivars
-```
+1. Identify Partitions:
+   ```bash
+   # List all partitions
+   sudo fdisk -l
+   
+   # Or use more readable format
+   lsblk -f
+   ```
 
-### Reinstall and Install GRUB
-```sh
-sudo apt-get install --reinstall grub-efi-amd64
-sudo grub-install --no-nvram --root-directory=/mnt
-```
+2. Mount Required Partitions:
+   ```bash
+   # Mount root partition
+   sudo mount /dev/sdXY /mnt  # Replace XY with your partition
+   
+   # Create and mount EFI partition
+   sudo mkdir -p /mnt/boot/efi
+   sudo mount /dev/sdXZ /mnt/boot/efi  # Replace XZ with EFI partition
+   
+   # Mount virtual filesystems
+   for i in /dev /dev/pts /proc /sys; do
+       sudo mount -B $i /mnt$i
+   done
+   ```
 
-### Change Root to Installed Ubuntu & Update GRUB
-```sh
-sudo chroot /mnt
-update-grub
-```
+3. Configure GRUB:
+   ```bash
+   # Load EFI variables
+   sudo modprobe efivars
+   
+   # Reinstall GRUB
+   sudo apt-get install --reinstall grub-efi-amd64
+   sudo grub-install --no-nvram --root-directory=/mnt
+   
+   # Update GRUB configuration
+   sudo chroot /mnt update-grub
+   ```
 
-### Hijack the Fallback Bootloader
-```sh
-cd /boot/efi/EFI
-cp -R ubuntu/* BOOT/
-cd BOOT
-cp grubx64.efi bootx64.efi
-```
+4. Configure Fallback Bootloader:
+   ```bash
+   # Copy bootloader files
+   cd /boot/efi/EFI
+   sudo cp -R ubuntu/* BOOT/
+   cd BOOT
+   sudo cp grubx64.efi bootx64.efi
+   ```
 
-Now, boot the system into Ubuntu. If you are dual-booting with Windows, follow the additional step mentioned below. To boot Ubuntu for now, press `F12` at startup and select Ubuntu.
+### Step 4: Post-Installation Configuration
 
-## Step 4: Permanently Hijack the Fallback Bootloader
-After booting into Ubuntu, open a terminal and run:
-```sh
-echo "grub-efi-amd64 grub2/force_efi_extra_removable boolean true" | sudo debconf-set-selections
-```
-Enter your password (it won't be visible on screen).
+1. First Boot:
+   - Restart system
+   - Press `F12` at startup
+   - Select 'Ubuntu' from boot menu
 
-Now, update GRUB:
-```sh
-update-grub
-```
+2. Configure Permanent Bootloader:
+   ```bash
+   # Set bootloader configuration
+   echo "grub-efi-amd64 grub2/force_efi_extra_removable boolean true" | \
+   sudo debconf-set-selections
+   
+   # Update GRUB
+   sudo update-grub
+   ```
 
-## Step 5: Remove `secureboot-db`
-To prevent issues later, remove this package:
-```sh
-sudo apt remove secureboot-db
-```
-Ensure you never reinstall it.
+3. Remove Problematic Package:
+   ```bash
+   # Remove secureboot-db
+   sudo apt remove secureboot-db
+   ```
 
-## Step 6: Final System Update
-To update your system, follow these steps:
-```sh
+### Step 5: System Updates
+
+```bash
+# Become root
 sudo -i
-```
-Enter your password, then execute these commands in order:
-```sh
+
+# Run updates
 do-release-upgrade
 apt update
 apt upgrade
@@ -105,7 +163,79 @@ apt dist-upgrade
 apt autoremove
 apt autoclean
 ```
-Reboot and repeat from `sudo -i` until `do-release-upgrade` reports **'no releases found'**.
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Black Screen After Boot**
+   - Solution: Add `nomodeset` to GRUB boot parameters
+   
+2. **Wi-Fi Not Working**
+   ```bash
+   # Install additional drivers
+   sudo ubuntu-drivers autoinstall
+   ```
+
+3. **GRUB Not Showing Windows**
+   ```bash
+   # Update GRUB menu
+   sudo update-grub
+   ```
+
+4. **System Won't Boot**
+   - Boot from USB
+   - Choose 'Try Ubuntu'
+   - Follow Step 3 again
+
+### Recovery Options
+
+1. **Create Recovery USB**
+   ```bash
+   # Install tools
+   sudo apt install boot-repair
+   
+   # Run boot repair
+   boot-repair
+   ```
+
+2. **Emergency GRUB Shell**
+   ```
+   set root=(hd0,gpt2)  # Adjust partition number
+   linux /boot/vmlinuz-linux root=/dev/sdaX
+   initrd /boot/initrd-linux.img
+   boot
+   ```
+
+## Additional Tips
+
+1. **Performance Optimization**
+   ```bash
+   # Install TLP for better battery life
+   sudo apt install tlp
+   sudo tlp start
+   
+   # Install hardware sensors
+   sudo apt install lm-sensors
+   sudo sensors-detect
+   ```
+
+2. **Recommended Software**
+   - Updated graphics drivers
+   - Power management tools
+   - Hardware monitoring utilities
+
+## Support and Resources
+
+- [Ubuntu Forums](https://ubuntuforums.org)
+- [Acer Community](https://community.acer.com)
+- [Ask Ubuntu](https://askubuntu.com)
+
+## Version History
+
+- v1.1: Added troubleshooting section
+- v1.0: Initial guide creation
 
 ---
-Congratulations! 🎉 You have successfully installed Ubuntu on your Acer Aspire ES-15.
+
+📝 **Note**: Keep this guide updated with any new solutions or issues you encounter. Share your experiences to help others with similar hardware.
